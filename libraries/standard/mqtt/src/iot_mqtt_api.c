@@ -859,52 +859,62 @@ static IotMqttError_t _subscriptionCommon( IotMqttOperationType_t operation,
         EMPTY_ELSE_MARKER;
     }
 
-    /* Send the SUBSCRIBE packet. */
-    if( ( flags & MQTT_INTERNAL_FLAG_BLOCK_ON_SEND ) == MQTT_INTERNAL_FLAG_BLOCK_ON_SEND )
+    if( ( flags & IOT_MQTT_FLAG_DONT_SEND_TO_BROKER ) != IOT_MQTT_FLAG_DONT_SEND_TO_BROKER )
     {
-        _IotMqtt_ProcessSend( IOT_SYSTEM_TASKPOOL, pSubscriptionOperation->job, pSubscriptionOperation );
+        /* Send the SUBSCRIBE packet. */
+        if( ( flags & MQTT_INTERNAL_FLAG_BLOCK_ON_SEND ) == MQTT_INTERNAL_FLAG_BLOCK_ON_SEND )
+        {
+            _IotMqtt_ProcessSend( IOT_SYSTEM_TASKPOOL, pSubscriptionOperation->job, pSubscriptionOperation );
+        }
+        else
+        {
+            status = _IotMqtt_ScheduleOperation( pSubscriptionOperation,
+                                                _IotMqtt_ProcessSend,
+                                                0 );
+
+            if( status != IOT_MQTT_SUCCESS )
+            {
+                IotLogError( "(MQTT connection %p) Failed to schedule %s for sending.",
+                            mqttConnection,
+                            IotMqtt_OperationType( operation ) );
+
+                if( operation == IOT_MQTT_SUBSCRIBE )
+                {
+                    _IotMqtt_RemoveSubscriptionByPacket( mqttConnection,
+                                                        pSubscriptionOperation->u.operation.packetIdentifier,
+                                                        MQTT_REMOVE_ALL_SUBSCRIPTIONS );
+                }
+                else
+                {
+                    EMPTY_ELSE_MARKER;
+                }
+
+                /* Clear the previously set (and now invalid) reference. */
+                if( pOperationReference != NULL )
+                {
+                    *pOperationReference = IOT_MQTT_OPERATION_INITIALIZER;
+                }
+                else
+                {
+                    EMPTY_ELSE_MARKER;
+                }
+
+                IOT_GOTO_CLEANUP();
+            }
+        }
+
+        status = IOT_MQTT_STATUS_PENDING;
     }
     else
     {
-        status = _IotMqtt_ScheduleOperation( pSubscriptionOperation,
-                                             _IotMqtt_ProcessSend,
-                                             0 );
-
-        if( status != IOT_MQTT_SUCCESS )
-        {
-            IotLogError( "(MQTT connection %p) Failed to schedule %s for sending.",
-                         mqttConnection,
-                         IotMqtt_OperationType( operation ) );
-
-            if( operation == IOT_MQTT_SUBSCRIBE )
-            {
-                _IotMqtt_RemoveSubscriptionByPacket( mqttConnection,
-                                                     pSubscriptionOperation->u.operation.packetIdentifier,
-                                                     MQTT_REMOVE_ALL_SUBSCRIPTIONS );
-            }
-            else
-            {
-                EMPTY_ELSE_MARKER;
-            }
-
-            /* Clear the previously set (and now invalid) reference. */
-            if( pOperationReference != NULL )
-            {
-                *pOperationReference = IOT_MQTT_OPERATION_INITIALIZER;
-            }
-            else
-            {
-                EMPTY_ELSE_MARKER;
-            }
-
-            IOT_GOTO_CLEANUP();
-        }
+        /* Add the subscription to the list, but do not send a SUBSCRIBE packet to broker */
+        EMPTY_ELSE_MARKER;
     }
 
     /* Clean up if this function failed. */
     IOT_FUNCTION_CLEANUP_BEGIN();
 
-    if( status != IOT_MQTT_SUCCESS )
+    if( status != IOT_MQTT_STATUS_PENDING )
     {
         if( pSubscriptionOperation != NULL )
         {
@@ -917,8 +927,6 @@ static IotMqttError_t _subscriptionCommon( IotMqttOperationType_t operation,
     }
     else
     {
-        status = IOT_MQTT_STATUS_PENDING;
-
         IotLogInfo( "(MQTT connection %p) %s operation scheduled.",
                     mqttConnection,
                     IotMqtt_OperationType( operation ) );
@@ -1508,15 +1516,19 @@ IotMqttError_t IotMqtt_SubscribeSync( IotMqttConnection_t mqttConnection,
 {
     IotMqttError_t status = IOT_MQTT_STATUS_PENDING;
     IotMqttOperation_t subscribeOperation = IOT_MQTT_OPERATION_INITIALIZER;
+    uint32_t asyncFlags = IOT_MQTT_FLAG_WAITABLE | MQTT_INTERNAL_FLAG_BLOCK_ON_SEND;
 
-    /* Flags are not used, but the parameter is present for future compatibility. */
-    ( void ) flags;
+    if( ( flags & IOT_MQTT_FLAG_DONT_SEND_TO_BROKER ) == IOT_MQTT_FLAG_DONT_SEND_TO_BROKER )
+    {
+        asyncFlags |= IOT_MQTT_FLAG_DONT_SEND_TO_BROKER;
+
+    }
 
     /* Call the asynchronous SUBSCRIBE function. */
     status = IotMqtt_SubscribeAsync( mqttConnection,
                                      pSubscriptionList,
                                      subscriptionCount,
-                                     IOT_MQTT_FLAG_WAITABLE | MQTT_INTERNAL_FLAG_BLOCK_ON_SEND,
+                                     asyncFlags,
                                      NULL,
                                      &subscribeOperation );
 
@@ -1586,15 +1598,18 @@ IotMqttError_t IotMqtt_UnsubscribeSync( IotMqttConnection_t mqttConnection,
 {
     IotMqttError_t status = IOT_MQTT_STATUS_PENDING;
     IotMqttOperation_t unsubscribeOperation = IOT_MQTT_OPERATION_INITIALIZER;
+    uint32_t asyncFlags =  IOT_MQTT_FLAG_WAITABLE | MQTT_INTERNAL_FLAG_BLOCK_ON_SEND;
 
-    /* Flags are not used, but the parameter is present for future compatibility. */
-    ( void ) flags;
+    if( ( flags & IOT_MQTT_FLAG_DONT_SEND_TO_BROKER ) == IOT_MQTT_FLAG_DONT_SEND_TO_BROKER )
+    {
+        asyncFlags |= IOT_MQTT_FLAG_DONT_SEND_TO_BROKER;
+    }
 
     /* Call the asynchronous UNSUBSCRIBE function. */
     status = IotMqtt_UnsubscribeAsync( mqttConnection,
                                        pSubscriptionList,
                                        subscriptionCount,
-                                       IOT_MQTT_FLAG_WAITABLE | MQTT_INTERNAL_FLAG_BLOCK_ON_SEND,
+                                       asyncFlags,
                                        NULL,
                                        &unsubscribeOperation );
 

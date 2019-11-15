@@ -1148,6 +1148,20 @@ typedef struct IotMqttNetworkInfo
  */
 #define IOT_MQTT_FLAG_WAITABLE        ( 0x00000001 )
 
+
+/**
+ * @brief This flag is used to add or remove a topic subscription without sending a SUBSCRIBE
+ * or UNSUBSCRIBE packet to the broker.
+ *
+ * The flag is valid only for @ref mqtt_function_subscribesync, @ref mqtt_function_subscribeasync,
+ * @ref mqtt_function_unsubscribesync and @ref mqtt_function_unsubscribeasync.
+ * The flag is useful if the application wants to receive messages on supported topics or topic filters,
+ * without actually creating a subscription at the broker.
+ * When the flag is enabled, a valid #IotMqttCallbackInfo_t <b>MUST</b> be provided.
+ */
+#define IOT_MQTT_FLAG_DONT_SEND_TO_BROKER     ( 0x00000002 )
+
+
 /**
  * @brief Causes @ref mqtt_function_disconnect to only free memory and not send
  * an MQTT DISCONNECT packet.

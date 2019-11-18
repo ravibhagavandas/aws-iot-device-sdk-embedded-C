@@ -28,15 +28,18 @@ set( DEMO_COMMON_HEADERS
 # DEMO_LIBRARY_DEPENDENCY. The semicolon itself must be escaped as \\\;
 set( DEMO_MAIN_FUNCTIONS
      RunMqttDemo
+     RunMqttPeerToPeerDemo
      RunShadowDemo
      RunDefenderDemo
      RunJobsDemo )
 set( DEMO_SOURCES
      src/iot_demo_mqtt.c
+     src/aws_iot_demo_mqtt_peer_to_peer.c
      src/aws_iot_demo_shadow.c
      src/aws_iot_demo_defender.c
      src/aws_iot_demo_jobs.c )
 set( DEMO_LIBRARY_DEPENDENCY
+     iotmqtt
      iotmqtt
      "awsiotshadow\\\;awsiotcommon"
      awsiotdefender 
